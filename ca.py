@@ -92,7 +92,7 @@ def newca():
         os.mkdir(os.path.join(CATOP, "newcerts"))
         os.mkdir(os.path.join(CATOP, "private"))
 
-        open(os.path.join(CATOP, "index.txt",), "w").write("")
+        open(os.path.join(CATOP, "index.txt"), "w").write("")
         open(os.path.join(CATOP, "crlnumber"), "w").write("01\n")
 
     if not os.path.join(CATOP, "private", CAKEY):
