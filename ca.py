@@ -67,6 +67,16 @@ def ca_helper():
             help()
         elif opt == "--newca":
             newca()
+        else:
+            newcert()
+            newreq()
+            newreq_nodes()
+            pkcs12(cname)
+            xsign()
+            sign()
+            signCA()
+            signcert()
+            verify(args)
 
     print(RET)
 
