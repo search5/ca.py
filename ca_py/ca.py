@@ -21,12 +21,14 @@
 
 # default openssl.cnf file has setup as per the following
 # demoCA ... where everything is stored
-from argparse import ArgumentParser
-import sys
+import configparser
 import os
 import re
-import subprocess
 import shlex
+import subprocess
+import sys
+from argparse import ArgumentParser
+from ca_py import openssl_util
 
 openssl_cmd = "openssl"
 if "OPENSSL" in os.environ:
@@ -37,9 +39,9 @@ else:
 SSLEAY_CONFIG = os.environ.get("SSLEAY_CONFIG", "")
 
 # 5 year
-DAYS = "-days 1825"
+DAYS = "1825"
 # 10 years
-CADAYS = "-days 3650"
+CADAYS = "3650"
 REQ = "%s req %s" % (openssl_cmd, SSLEAY_CONFIG)
 CA = "%s ca %s" % (openssl_cmd, SSLEAY_CONFIG)
 VERIFY = "%s verify" % openssl_cmd
@@ -68,11 +70,54 @@ def ca_helper():
     group.add_argument("--verify", help="Certification Verify", action="store", type=str,
                        nargs='*', metavar="cert.pem")
 
+    parser.add_argument("-i", "--config", help="Location of the CA.ini file to be used for issuing certificates",
+                        action="store", type=str, nargs=1, metavar=("filename",))
+
+    parser.add_argument("-d", "--days", help="Client Certificate Validity Period", action="store",
+                        type=str, metavar=("days"))
+    parser.add_argument("--cadays", help="Root Certification Authority Certificate Validity Period",
+                        action="store", type=str, metavar=("days"))
+    parser.add_argument("--catop", help="Certification Authority Directory", action="store", type=str,
+                        metavar=("ca_top_directory"))
+    parser.add_argument("--cakey", help="Certificate authority secret key filename", action="store", type=str,
+                        metavar=("ca_key_filename"))
+    parser.add_argument("--careq", help="Certificate authority authentication request key filename", action="store",
+                        type=str, metavar=("ca_request_filename"))
+    parser.add_argument("--cacert", help="Certificate Authority Key File Name", action="store", type=str,
+                        metavar=("ca_certficate_filename"))
+
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         sys.exit(2)
 
     args = parser.parse_args()
+
+    # 설정 파일과 개별 설정 옵션은 겹쳐서 사용할 수 없습니다.
+    if args.config and (args.days or args.cadays or args.catop or args.cakey or args.careq or args.cacert):
+        print("The ca.ini file and the individual setup options are mutually exclusive.")
+        sys.exit(1)
+
+    # 인증서 유효기간, 루트인증서 유효기간, 인증서 최상위 디렉터리 설정
+    if args.config:
+        config(args.config)
+    if args.days:
+        ca_entry(args.days, "days")
+    if args.cadays:
+        ca_entry(args.cadays, "cadays")
+
+    # 인증서 생성에 사용되는 기본값 지정
+    if args.catop:
+        ca_entry(args.catop, "catop")
+    if args.cakey:
+        ca_entry(args.cakey, "cakey")
+    if args.careq:
+        ca_entry(args.careq, "careq")
+    if args.cacert:
+        ca_entry(args.cacert, "cacert")
+
+    # 실행시 한번, openssl.cnf 파일 점검해서 만들어둠
+    openssl_util.make_openssl_cnf(CATOP, DAYS)
+
     if args.newca:
         newca()
     elif args.newcert:
@@ -135,7 +180,7 @@ def newca():
             keyfile_path = os.path.join(CATOP, "private", CAKEY)
             infile_path = os.path.join(CATOP, CAREQ)
 
-            serial_create_cmd = "{0} -create_serial -out {1} {2} -batch " \
+            serial_create_cmd = "{0} -create_serial -out {1} -days {2} -batch " \
                                 "-keyfile {3} -selfsign " \
                                 "-extensions v3_ca -infiles {4}".format(CA, out_path, CADAYS, keyfile_path, infile_path)
 
@@ -144,21 +189,21 @@ def newca():
 
 def newcert():
     # create a certificate
-    cmd = "{0} -new -x509 -keyout newkey.pem -out newcert.pem {1}".format(REQ, DAYS)
+    cmd = "{0} -new -x509 -keyout newkey.pem -out newcert.pem -days {1}".format(REQ, DAYS)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("Certificate is in newcert.pem, private key is in newkey.pem")
 
 
 def newreq():
     # create a certificate request
-    cmd = "{0} -new -keyout newkey.pem -out newreq.pem {1}".format(REQ, DAYS)
+    cmd = "{0} -new -keyout newkey.pem -out newreq.pem -days {1}".format(REQ, DAYS)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("Request is in newreq.pem, private key is in newkey.pem")
 
 
 def newreq_nodes():
     # create a certificate request
-    cmd = "{0} -new -nodes -keyout newkey.pem -out newreq.pem {1}".format(REQ, DAYS)
+    cmd = "{0} -new -nodes -keyout newkey.pem -out newreq.pem -days {1}".format(REQ, DAYS)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("Request is in newreq.pem, private key is in newkey.pem")
 
@@ -230,6 +275,76 @@ def cp_pem(*args):
     outfile_obj.close()
 
     return 1
+
+
+def config(config_file_loc):
+    global CATOP, CAKEY, CAREQ, CACERT, DAYS, CADAYS
+
+    if not os.path.exists(config_file_loc[0]):
+        print("The configuration file you specified does not exist. Use the default value.")
+        print("CATOP: %s\nCAKEY: %s\nCAREQ: %s\nCACERT: %s\nDAYS: %s\nCADAYS: %s" % (
+            CATOP, CAKEY, CAREQ, CACERT, DAYS, CADAYS ))
+        sys.exit(1)
+
+    ca_ini = configparser.ConfigParser()
+    ca_ini.read(config_file_loc[0])
+
+    if 'CA' not in ca_ini.sections():
+        print("Invalid configuration file. The CA section must be present.")
+        sys.exit(1)
+
+    if "CATOP" in ca_ini['CA']:
+        CATOP = ca_ini['CA']['CATOP']
+    else:
+        ca_ini['CA']['CATOP'] = CATOP
+
+    if "CAKEY" in ca_ini['CA']:
+        CAKEY = ca_ini['CA']['CAKEY']
+    else:
+        ca_ini['CA']['CAKEY'] = CAKEY
+
+    if "CAREQ" in ca_ini['CA']:
+        CAREQ = ca_ini['CA']['CAREQ']
+    else:
+        ca_ini['CA']['CAREQ'] = CAREQ
+
+    if "CACERT" in ca_ini['CA']:
+        CACERT = ca_ini['CA']['CACERT']
+    else:
+        ca_ini['CA']['CACERT'] = CACERT
+
+    if "DAYS" in ca_ini['CA']:
+        DAYS = ca_ini['CA']['DAYS']
+    else:
+        ca_ini['CA']['DAYS'] = DAYS
+
+    if "CADAYS" in ca_ini['CA']:
+        CADAYS = ca_ini['CA']['CADAYS']
+    else:
+        ca_ini['CA']['CADAYS'] = CADAYS
+
+    ca_ini.write(open(config_file_loc[0], "w"))
+
+    print("The final settings are as follows.")
+    for ca_entry in ("CATOP", "CAKEY", "CAREQ", "CACERT", "DAYS", "CADAYS"):
+        print("%s: %s" % (ca_entry, ca_ini['CA'].get(ca_entry, '')))
+
+
+def ca_entry(values, field):
+    global CATOP, CAKEY, CAREQ, CACERT, DAYS, CADAYS
+
+    if field == "days":
+        DAYS = values[0]
+    elif field == "cadays":
+        CADAYS = values[0]
+    elif field == "catop":
+        CATOP = values[0]
+    elif field == "cakey":
+        CAKEY = values[0]
+    elif field == "careq":
+        CAREQ = values[0]
+    elif field == "cacert":
+        CACERT = values[0]
 
 if __name__ == "__main__":
     ca_helper()
