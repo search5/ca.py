@@ -21,7 +21,7 @@
 
 # default openssl.cnf file has setup as per the following
 # demoCA ... where everything is stored
-from optparse import OptionParser, Option
+from argparse import ArgumentParser
 import sys
 import os
 import re
@@ -53,31 +53,51 @@ CACERT = "cacert.pem"
 
 
 def ca_helper():
-    help_usage = "usage: %prog --signcert certfile keyfile|--newcert|--newreq|--newreq-nodes|--newca|--sign|--verify"
-
-    parser = OptionParser(usage=help_usage)
-    parser.add_option("--signcert", type="string", nargs=2, dest="signcert",
-                      help="Certification Sign", action="callback", callback=signcert, metavar="certfile keyfile")
-    parser.add_option("--newcert", help="New Certification", action="callback", callback=newcert)
-    parser.add_option("--newreq", help="New Certification CSR", action="callback", callback=newreq)
-    parser.add_option("--newreq-nodes", help="New Certification Nodes", action="callback", callback=newreq_nodes)
-    parser.add_option("--pkcs12", help="PKCS12", type="string", nargs=1, metavar="Certification Name",
-                      action="callback", callback=pkcs12)
-    parser.add_option("--xsign", help="Certification xsign", action="callback", callback=xsign)
-    parser.add_option("--sign", "--signreq", help="Certification sign", action="callback", callback=sign)
-    parser.add_option("--signCA", help="CA sign", action="callback", callback=signCA)
-    parser.add_option("--verify", help="Certification Verify", action="callback", callback=verify, type="string")
-
-    (options, args) = parser.parse_args()
+    parser = ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--newca", help="New Certificate Authority", action="store_true")
+    group.add_argument("--newcert", help="New Certification", action="store_true")
+    group.add_argument("--newreq", help="New Certification CSR", action="store_true")
+    group.add_argument("--newreq-nodes", help="New Certification Nodes", action="store_true")
+    group.add_argument("--pkcs12", help="PKCS12", type=str, nargs=1, metavar=("Certification Name",), action="store")
+    group.add_argument("--xsign", help="Certification xsign", action="store_true")
+    group.add_argument("--sign", "--signreq", help="Certification sign", action="store_true")
+    group.add_argument("--signcert", type=str, nargs=2, dest="signcert",
+                        help="Certification Sign", action="store", metavar=("certfile", "keyfile"))
+    group.add_argument("--signCA", help="CA sign", action="store_true")
+    group.add_argument("--verify", help="Certification Verify", action="store", type=str,
+                       nargs='*', metavar="cert.pem")
 
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         sys.exit(2)
 
+    args = parser.parse_args()
+    if args.newca:
+        newca()
+    elif args.newcert:
+        newcert()
+    elif args.newreq:
+        newreq()
+    elif args.newreq_nodes:
+        newreq_nodes()
+    elif args.pkcs12:
+        pkcs12(args.pkcs12)
+    elif args.xsign:
+        xsign()
+    elif args.sign:
+        sign()
+    elif args.signcert:
+        signcert(args.signcert)
+    elif args.signCA:
+        signCA()
+    elif args.verify:
+        verify(args.verify)
+
     return
 
 
-def newca(option, opt_str, value, parser, *args, **kwargs):
+def newca():
     # if explicitly asked for or it doesn't exist then setup the
     # directory structure that Eric likes to manage things
 
@@ -109,7 +129,7 @@ def newca(option, opt_str, value, parser, *args, **kwargs):
 
             key_create_cmd = "{0} -newkey rsa:2048 -keyout {1} -out {2}".format(REQ, keyout_path, out_path)
 
-            subprocess.Popen(shlex.split(key_create_cmd), stdout=subprocess.PIPE)
+            subprocess.call(shlex.split(key_create_cmd), stdout=subprocess.PIPE)
 
             out_path = os.path.join(CATOP, CACERT)
             keyfile_path = os.path.join(CATOP, "private", CAKEY)
@@ -119,83 +139,76 @@ def newca(option, opt_str, value, parser, *args, **kwargs):
                                 "-keyfile {3} -selfsign " \
                                 "-extensions v3_ca -infiles {4}".format(CA, out_path, CADAYS, keyfile_path, infile_path)
 
-            subprocess.Popen(shlex.split(serial_create_cmd), stdout=subprocess.PIPE)
+            subprocess.call(shlex.split(serial_create_cmd), stdout=subprocess.PIPE)
 
 
-def newcert(option, opt_str, value, parser, *args, **kwargs):
+def newcert():
     # create a certificate
     cmd = "{0} -new -x509 -keyout newkey.pem -out newcert.pem {1}".format(REQ, DAYS)
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
+    subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("Certificate is in newcert.pem, private key is in newkey.pem")
 
 
-def newreq(option, opt_str, value, parser, *args, **kwargs):
+def newreq():
     # create a certificate request
     cmd = "{0} -new -keyout newkey.pem -out newreq.pem {1}".format(REQ, DAYS)
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
+    subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("Request is in newreq.pem, private key is in newkey.pem")
 
 
-def newreq_nodes(option, opt_str, value, parser, *args, **kwargs):
+def newreq_nodes():
     # create a certificate request
     cmd = "{0} -new -nodes -keyout newkey.pem -out newreq.pem {1}".format(REQ, DAYS)
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
+    subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("Request is in newreq.pem, private key is in newkey.pem")
 
 
-def pkcs12(option, opt_str, value, parser, *args, **kwargs):
-    cname = "My Certificate" if not value else value
+def pkcs12(values):
+    cname = "My Certificate" if not values[0] else values[0]
     certfile_path = os.path.join(CATOP, CACERT)
     cmd = "{0} -in newcert.pem -inkey newkey.pem " \
           "-certfile ${1} -out newcert.p12 " \
           "-export -name {2}".format(PKCS12, certfile_path, cname)
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
+    subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("PKCS #12 file is in newcert.p12")
-    sys.exit(1)
 
 
-def xsign(option, opt_str, value, parser, *args, **kwargs):
+def xsign():
     cmd = "{0} -policy policy_anything -infiles newreq.pem".format(CA)
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
+    subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
 
 
-def sign(option, opt_str, value, parser, *args, **kwargs):
+def sign():
     cmd = "{0} -policy policy_anything -out newcert.pem -infiles newreq.pem".format(CA)
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
+    subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("Signed certificate is in newcert.pem")
 
 
-def signCA(option, opt_str, value, parser, *args, **kwargs):
+def signCA():
     cmd = "{0} -policy policy_anything -out newcert.pem -extensions v3_ca -infiles newreq.pem".format(CA)
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
+    subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("Signed CA certificate is in newcert.pem")
 
 
-def signcert(option, opt_str, value, parser, *args, **kwargs):
-    certfile, keyfile = value
-    cmd = "{0} -x509toreq -in newreq.pem -signkey newreq.pem -out tmp.pem".format(X509)
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
+def signcert(values):
+    certfile, keyfile = values
+    cmd = "{0} -x509toreq {1} -in {2} -signkey {3} -out tmp.pem".format(X509, DAYS, certfile, keyfile)
+    subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     cmd = "{0} -policy policy_anything -out newcert.pem -infiles tmp.pem".format(CA)
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
+    subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     print("Signed certificate is in newcert.pem")
 
 
-def verify(option, opt_str, value, parser, *args, **kwargs):
-    print(value)
-    """
-    if (shift) {
-        foreach $j (@ARGV) {
-            system ("$VERIFY -CAfile $CATOP/$CACERT $j");
-            $RET=$? if ($? != 0);
-        }
-        exit $RET;
-    } else {
-        system ("$VERIFY -CAfile $CATOP/$CACERT newcert.pem");
-        $RET=$?;
-        exit 0;
-    }
-    """
-    pass
+def verify(values):
+    if len(values) > 1:
+        for cert_file in values:
+            cafile_path = os.path.join(CATOP, CACERT)
+            cmd = "{0} -CAfile {1} {2}".format(VERIFY, cafile_path, cert_file)
+            subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
+    else:
+        cafile_path = os.path.join(CATOP, CACERT)
+        cmd = "{0} -CAfile {1} newcert.pem".format(VERIFY, cafile_path)
+        subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
 
 
 def cp_pem(*args):
