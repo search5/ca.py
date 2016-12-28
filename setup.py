@@ -21,8 +21,6 @@ setup(
         "Operating System :: POSIX :: Linux",
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: Microsoft :: Windows :: Windows 7",
-        "Operating System :: Microsoft :: Windows :: Windows 8",
-        "Operating System :: Microsoft :: Windows :: Windows 10",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3.3",
         "Programming Language :: Python :: 3.4",
