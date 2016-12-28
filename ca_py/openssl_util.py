@@ -1,6 +1,7 @@
-import configparser
+from configobj import ConfigObj
 import os
 import sys
+from io import StringIO
 
 
 def make_openssl_cnf(catop, days):
@@ -377,9 +378,15 @@ ess_cert_id_chain	= no	# Must the ESS cert id chain be included?
 
 
 def openssl_cnf_edit(cnf_path, catop, days):
-    ssl_cnf = configparser.ConfigParser()
-    ssl_cnf.read(cnf_path)
+    cnf = StringIO()
+    cnf.write(open(cnf_path, "r").read())
+    cnf.seek(0)
+
+    ssl_cnf = ConfigObj(cnf)
 
     ssl_cnf['CA_default']['dir'] = catop
     ssl_cnf['CA_default']['default_days'] = days
-    ssl_cnf.write(open(cnf_path, "w"))
+
+    all_line = map(lambda x: x.strip(), ssl_cnf.write())
+
+    open(cnf_path, "w").write('\n'.join(all_line))
