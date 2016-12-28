@@ -20,5 +20,7 @@ setup(
         "Programming Language :: Python :: 3.3",
         "Topic :: System :: Networking",
         "Topic :: Security :: Cryptography"
-    ]
+    ],
+    scripts=['ca/ca.py'],
+    license='Apache License 2.0'
 )
