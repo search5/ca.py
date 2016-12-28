@@ -2,12 +2,12 @@ from distutils.core import setup
 setup(
     name = 'CA.py',
     packages = ['ca'], # this must be the same as the name above
-    version = '1.0',
+    version = '1.1',
     description = 'CA.pl Python Fork',
     author = 'Lee Ji-Ho',
     author_email = 'search5@gmail.com',
     url = 'https://github.com/search5/ca.py', # use the URL to the github repo
-    download_url = 'https://github.com/search5/ca.py/tarball/1.0', # I'll explain this in a second
+    download_url = 'https://github.com/search5/ca.py/tarball/1.1', # I'll explain this in a second
     keywords = ['openssl', 'ca', 'cert'], # arbitrary keywords
     classifiers = [
         "Development Status :: 4 - Beta",
