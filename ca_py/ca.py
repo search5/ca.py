@@ -149,17 +149,23 @@ def newca():
     NEW = "1"
     if NEW or (not os.path.exists(os.path.join(CATOP, "serial"))):
         # create the directory hierarchy
-        os.mkdir(CATOP)
+        makedirs = [
+            CATOP, os.path.join(CATOP, "certs"),
+            os.path.join(CATOP, "crl"),
+            os.path.join(CATOP, "newcerts"),
+            os.path.join(CATOP, "private")
+        ]
+
+        for entry in makedirs:
+            if not os.path.exists(entry):
+                os.mkdir(CATOP)
+
         print(CATOP)
-        os.mkdir(os.path.join(CATOP, "certs"))
-        os.mkdir(os.path.join(CATOP, "crl"))
-        os.mkdir(os.path.join(CATOP, "newcerts"))
-        os.mkdir(os.path.join(CATOP, "private"))
 
         open(os.path.join(CATOP, "index.txt"), "w").write("")
         open(os.path.join(CATOP, "crlnumber"), "w").write("01\n")
 
-    if not os.path.join(CATOP, "private", CAKEY):
+    if not os.path.exists(os.path.join(CATOP, "private", CAKEY)):
         tmp_file = input("CA certificate filename (or enter to create) ")
         tmp_file = tmp_file.rstrip()
 

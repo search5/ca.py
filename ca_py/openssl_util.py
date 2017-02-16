@@ -32,7 +32,7 @@ oid_section		= new_oids
 # Add a simple OID like this:
 # testoid1=1.2.3.4
 # Or use config file substitution like this:
-# testoid2=${testoid1}.5.6
+# testoid2=${{testoid1}}.5.6
 
 # Policies used by the TSA examples.
 tsa_policy1 = 1.2.3.4.1
@@ -383,6 +383,7 @@ def openssl_cnf_edit(cnf_path, catop, days):
     cnf.seek(0)
 
     ssl_cnf = ConfigObj(cnf)
+    ssl_cnf.final_comment = ['#']
 
     ssl_cnf['CA_default']['dir'] = catop
     ssl_cnf['CA_default']['default_days'] = days
