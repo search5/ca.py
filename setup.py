@@ -13,6 +13,7 @@ setup(
     platforms='any',
     install_requires=[
           'configobj==5.0.6',
+          'click'
     ],
     classifiers = [
         "Development Status :: 4 - Beta",
