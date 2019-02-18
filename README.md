@@ -9,7 +9,7 @@ OpenSSL CA(Certificate Authority) 생성 및 인증서(Certification) 생성 도
 인증 기관을 생성하는 명령으로서 실행시 CATOP의 위치(설정 파일 혹은 커맨드 옵션 지정)에 인증 기관 파일을 생성합니다.
 
 ```sh
-# ca.py --newca
+# ca.py newca
 ```
 
 ## 신규 인증서 생성
@@ -17,14 +17,14 @@ OpenSSL CA(Certificate Authority) 생성 및 인증서(Certification) 생성 도
 인증서 파일 이름을 변경할 수 있는 기능은 추후 제공 예정입니다.
 
 ```sh
-$ ca.py --newreq
+$ ca.py newreq
 ```
 
 ## 인증서 사인
 인증기관의 인증서로 클라이언트 인증서(newreq.pem)을 인증해주는 기능입니다. 실행 결과로 newcert.pem 파일이 만들어집니다.
 
 ```sh
-# ca.py --sign
+# ca.py sign
 ```
 
 ## 인증기관 생성에 필요한 추가 옵션
@@ -59,41 +59,31 @@ CAREQ, CACERT가 있습니다. 아래와 같이 지정하며 신규 인증기관
 
 ## ca.py 실행 결과
 ```sh
-usage: ca.py [-h]
-             [--newca | --newcert | --newreq | --newreq-nodes | --pkcs12 Certification Name | --xsign |
-              --sign | --signcert certfile keyfile | --signCA | --verify [cert.pem [cert.pem ...]]]
-             [-i filename] [-d days] [--cadays days]
-             [--catop ca_top_directory] [--cakey ca_key_filename]
-             [--careq ca_request_filename] [--cacert ca_certficate_filename]
+Usage: ca.py [OPTIONS] COMMAND [ARGS]...
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --newca               New Certificate Authority
-  --newcert             New Certification
-  --newreq              New Certification CSR
-  --newreq-nodes        New Certification Nodes
-  --pkcs12 Certification Name
-                        PKCS12
-  --xsign               Certification xsign
-  --sign, --signreq     Certification sign
-  --signcert certfile keyfile
-                        Certification Sign
-  --signCA              CA sign
-  --verify [cert.pem [cert.pem ...]]
-                        Certification Verify
-  -i filename, --config filename
-                        Location of the CA.ini file to be used for issuing
+Options:
+  --debug / --no-debug
+  -i, --config TEXT     Location of the CA.ini file to be used for issuing
                         certificates
-  -d days, --days days  Client Certificate Validity Period
-  --cadays days         Root Certification Authority Certificate Validity
+  -d, --days TEXT       Client Certificate Validity Period
+  --cadays TEXT         Root Certification Authority Certificate Validity
                         Period
-  --catop ca_top_directory
-                        Certification Authority Directory
-  --cakey ca_key_filename
-                        Certificate authority secret key filename
-  --careq ca_request_filename
-                        Certificate authority authentication request key
+  --catop TEXT          Certification Authority Directory
+  --cakey TEXT          Certificate authority secret key filename
+  --careq TEXT          Certificate authority authentication request key
                         filename
-  --cacert ca_certficate_filename
-                        Certificate Authority Key File Name
+  --cacert TEXT         Certificate Authority Key File Name
+  --help                Show this message and exit.
+
+Commands:
+  newca         New Certificate Authority
+  newcert       New Certification
+  newreq        New Certification CSR
+  newreq-nodes  New Certification Nodes
+  pkcs12        PKCS12
+  sign          Certification sign(or equal command signreq)
+  signca        CA sign
+  signcert      Certification Sign
+  verify        Certification Verify
+  xsign         Certification xsign
 ```

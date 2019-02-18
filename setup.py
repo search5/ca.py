@@ -2,13 +2,13 @@ from setuptools import setup
 
 setup(
     name = 'CA.py',
-    packages = ['ca_py'], # this must be the same as the name above
-    version = '1.6',
+    packages = ['certificator'], # this must be the same as the name above
+    version = '1.7',
     description = 'CA.pl Python Fork',
     author = 'Lee Ji-Ho',
     author_email = 'search5@gmail.com',
     url = 'https://github.com/search5/ca.py', # use the URL to the github repo
-    download_url = 'https://github.com/search5/ca.py/tarball/1.6', # I'll explain this in a second
+    download_url = 'https://github.com/search5/ca.py/tarball/1.7', # I'll explain this in a second
     keywords = ['openssl', 'ca', 'cert'], # arbitrary keywords
     platforms='any',
     install_requires=[
@@ -29,6 +29,6 @@ setup(
         "Topic :: System :: Networking",
         "Topic :: Security :: Cryptography"
     ],
-    scripts=['ca_py/ca.py'],
+    scripts=['certificator/ca.py'],
     license='Apache License 2.0'
 )

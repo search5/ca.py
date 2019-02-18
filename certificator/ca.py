@@ -25,11 +25,11 @@ import configparser
 import os
 import re
 import shlex
+import shutil
 import subprocess
-import sys
 import click
 from pathlib import Path
-#from .ca_py import openssl_util
+from certificator import openssl_util
 
 openssl_cmd = "openssl"
 if "OPENSSL" in os.environ:
@@ -50,9 +50,10 @@ X509 = "%s x509" % openssl_cmd
 PKCS12 = "%s pkcs12" % openssl_cmd
 
 CATOP = "/etc/ssl/ca"
-CAKKEY = "cakey.pem"
+CAKEY = "cakey.pem"
 CAREQ = "careq.pem"
 CACERT = "cacert.pem"
+
 
 class AliasedGroup(click.Group):
     def get_command(self, ctx, cmd_name):
@@ -60,9 +61,10 @@ class AliasedGroup(click.Group):
             return super().get_command(ctx, 'sign')
         return super().get_command(ctx, cmd_name)
 
+
 def file_exists(ctx, param, value):
     checker = lambda x: os.path.exists(x)
-    
+
     if isinstance(value, tuple):
         ret_value = []
         for item in value:
@@ -71,29 +73,35 @@ def file_exists(ctx, param, value):
             else:
                 ret_value.append(item)
         return tuple(ret_value)
-    
+
     if os.path.exists(value):
         return value
     raise click.FileError(value, hint="{0} 파일이 존재하지 않습니다. 다시 확인하여 주세요".format(value))
 
+
 @click.group(cls=AliasedGroup)
 @click.option('--debug/--no-debug', default=False)
-@click.option("-i", "--config", help="Location of the CA.ini file to be used for issuing certificates") 
+@click.option("-i", "--config", help="Location of the CA.ini file to be used for issuing certificates")
 @click.option("-d", "--days", help="Client Certificate Validity Period")
 @click.option("--cadays", help="Root Certification Authority Certificate Validity Period")
 @click.option("--catop", help="Certification Authority Directory")
 @click.option("--cakey", help="Certificate authority secret key filename")
 @click.option("--careq", help="Certificate authority authentication request key filename")
 @click.option("--cacert", help="Certificate Authority Key File Name")
+@click.option("--key-length", help="")
 @click.pass_context
-def cli(ctx, debug, config, days, cadays, catop, cakey, careq, cacert):
+def cli(ctx, debug, config, days, cadays, catop, cakey, careq, cacert, key_length):
     # ensure that ctx.obj exists and is a dict (in case `cli()` is called
     # by means other than the `if` block below
     ctx.ensure_object(dict)
     ctx.obj['DEBUG'] = debug
-    
+
+    key_length = int(key_length)
+    if key_length < 2048:
+        raise click.ClickException("Key length must be at least 2048.")
+
     if config:
-        ctx.obj['config'] = config_read(config_file, ctx)
+        ctx.obj['config'] = config_read(config, ctx)
     else:
         ctx.obj['days'] = days or DAYS
         ctx.obj['cadays'] = cadays or CADAYS
@@ -101,11 +109,12 @@ def cli(ctx, debug, config, days, cadays, catop, cakey, careq, cacert):
         ctx.obj['cakey'] = cakey or CAKEY
         ctx.obj['careq'] = careq or CAREQ
         ctx.obj['cacert'] = cacert or CACERT
-    
+
     if config and (days or cadays or catop or cakey or careq or cacert):
         raise click.UsageError("The ca.ini file and the individual setup options are mutually exclusive.", ctx)
-    
-    #openssl_util.make_openssl_cnf(ctx.obj['catop'], DAYS)
+
+    openssl_util.make_openssl_cnf(ctx.obj['catop'], DAYS)
+
 
 @cli.command(help="New Certificate Authority")
 @click.pass_context
@@ -145,9 +154,11 @@ def newca(ctx):
 
             serial_create_cmd = "{0} -create_serial -out {1} -days {2} -batch " \
                                 "-keyfile {3} -selfsign " \
-                                "-extensions v3_ca -infiles {4}".format(CA, out_path, ctx.obj['cadays'], keyfile_path, infile_path)
+                                "-extensions v3_ca -infiles {4}".format(CA, out_path, ctx.obj['cadays'], keyfile_path,
+                                                                        infile_path)
 
             subprocess.call(shlex.split(serial_create_cmd), stdout=subprocess.PIPE)
+
 
 @cli.command(help="New Certification")
 @click.pass_context
@@ -156,7 +167,8 @@ def newcert(ctx):
     cmd = "{0} -new -x509 -keyout newkey.pem -out newcert.pem -days {1}".format(REQ, DAYS)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     click.echo("Certificate is in newcert.pem, private key is in newkey.pem")
-    
+
+
 @cli.command(help="New Certification CSR")
 @click.pass_context
 def newreq(ctx):
@@ -164,7 +176,8 @@ def newreq(ctx):
     cmd = "{0} -new -keyout newkey.pem -out newreq.pem -days {1}".format(REQ, DAYS)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     click.echo("Request is in newreq.pem, private key is in newkey.pem")
-    
+
+
 @cli.command(name='newreq-nodes', help="New Certification Nodes")
 @click.pass_context
 def newreq_nodes(ctx):
@@ -173,23 +186,26 @@ def newreq_nodes(ctx):
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     click.echo("Request is in newreq.pem, private key is in newkey.pem")
 
+
 @cli.command(help="PKCS12")
 @click.argument('certification_name', metavar='Certification Name', required=True)
 @click.pass_context
 def pkcs12(ctx, certification_name):
-    cname = "My Certificate" if not values[0] else values[0]
+    cname = certification_name or "My Certificate"
     certfile_path = os.path.join(ctx.obj['catop'], ctx.obj['cacert'])
     cmd = "{0} -in newcert.pem -inkey newkey.pem " \
           "-certfile ${1} -out newcert.p12 " \
           "-export -name {2}".format(PKCS12, certfile_path, cname)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     click.echo("PKCS #12 file is in newcert.p12")
-    
+
+
 @cli.command(help="Certification xsign")
 @click.pass_context
 def xsign(ctx):
     cmd = "{0} -policy policy_anything -infiles newreq.pem".format(CA)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
+
 
 @cli.command(help="Certification sign(or equal command signreq)")
 @click.pass_context
@@ -198,18 +214,18 @@ def sign(ctx):
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     click.echo("Signed certificate is in newcert.pem")
 
+
 @cli.command(help="Certification Sign")
 @click.argument('certfile', callback=file_exists, required=True)
 @click.argument('keyfile', callback=file_exists, required=True)
 @click.pass_context
 def signcert(ctx, certfile, keyfile):
-    certfile, keyfile = values
     cmd = "{0} -x509toreq {1} -in {2} -signkey {3} -out tmp.pem".format(X509, DAYS, certfile, keyfile)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     cmd = "{0} -policy policy_anything -out newcert.pem -infiles tmp.pem".format(CA)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     click.echo("Signed certificate is in newcert.pem")
-    
+
 
 @cli.command(help="CA sign")
 @click.pass_context
@@ -217,14 +233,14 @@ def signCA(ctx):
     cmd = "{0} -policy policy_anything -out newcert.pem -extensions v3_ca -infiles newreq.pem".format(CA)
     subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
     click.echo("Signed CA certificate is in newcert.pem")
-    
+
 
 @cli.command(help="Certification Verify")
 @click.argument('cert_pem', callback=file_exists, nargs=-1, required=True)
 @click.pass_context
 def verify(ctx, cert_pem):
-    if len(values) > 1:
-        for cert_file in values:
+    if len(cert_pem) > 1:
+        for cert_file in cert_pem:
             cafile_path = os.path.join(ctx.obj['catop'], ctx.obj['cacert'])
             cmd = "{0} -CAfile {1} {2}".format(VERIFY, cafile_path, cert_file)
             subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
@@ -233,23 +249,11 @@ def verify(ctx, cert_pem):
         cmd = "{0} -CAfile {1} newcert.pem".format(VERIFY, cafile_path)
         subprocess.call(shlex.split(cmd), stdout=subprocess.PIPE)
 
+
 def cp_pem(*args):
     infile, outfile, bound = args
 
-    infile_obj = open(infile, "r")
-    outfile_obj = open(outfile, "w")
-
-    for line in infile_obj.readline():
-        flag = 1 if re.search("^-----BEGIN.*{0}".format(bound), line) else 0
-        outfile_obj.write(line)
-
-        if flag:
-            outfile_obj.write(line)
-            if re.search("^-----END.*{0}".format(bound), line):
-                break
-
-    infile_obj.close()
-    outfile_obj.close()
+    shutil.copyfile(infile, outfile)
 
     return 1
 
@@ -257,25 +261,27 @@ def cp_pem(*args):
 def config_read(config_file_loc, ctx):
     if not os.path.exists(config_file_loc[0]):
         raise click.UsageError("The configuration file you specified does not exist. Use the default value."
-                               "ctx.obj['catop']: %s\nctx.obj['cakey']: %s\nctx.obj['careq']: %s\nctx.obj['cacert']: %s\nDAYS: %s\nCADAYS: %s" % (ctx.obj['catop'], ctx.obj['cakey'], ctx.obj['careq'], ctx.obj['cacert'], DAYS, CADAYS))
+                               "ctx.obj['catop']: %s\nctx.obj['cakey']: %s\nctx.obj['careq']: %s\nctx.obj['cacert']: %s\nDAYS: %s\nCADAYS: %s" % (
+                               ctx.obj['catop'], ctx.obj['cakey'], ctx.obj['careq'], ctx.obj['cacert'], DAYS, CADAYS))
 
     ca_ini = configparser.ConfigParser()
     ca_ini.read(config_file_loc[0])
 
     if 'CA' not in ca_ini.sections():
         raise click.ClickException("Invalid configuration file. The CA section must be present.")
-    
+
     ctx.obj['days'] = ca_ini['CA'].get('DAYS', '')
     ctx.obj['cadays'] = ca_ini['CA'].get('CADAYS', '')
     ctx.obj['catop'] = ca_ini['CA'].get('CATOP', '')
     ctx.obj['cakey'] = ca_ini['CA'].get('CAKEY', '')
     ctx.obj['careq'] = ca_ini['CA'].get('CAREQ', '')
     ctx.obj['cacert'] = ca_ini['CA'].get('CACERT', '')
-    
+
     click.echo("The final settings are as follows.")
-    
+
     for ca_entry in ("ctx.obj['catop']", "ctx.obj['cakey']", "ctx.obj['careq']", "ctx.obj['cacert']", "DAYS", "CADAYS"):
         click.echo("%s: %s" % (ca_entry, ca_ini['CA'].get(ca_entry, '')))
+
 
 if __name__ == "__main__":
     cli(obj={})
