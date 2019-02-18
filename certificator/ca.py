@@ -90,13 +90,14 @@ def file_exists(ctx, param, value):
 @click.option("--cacert", help="Certificate Authority Key File Name")
 @click.option("--key-length", help="")
 @click.pass_context
-def cli(ctx, debug, config, days, cadays, catop, cakey, careq, cacert, key_length="2048"):
+def cli(ctx, debug, config, days, cadays, catop, cakey, careq, cacert, key_length):
     # ensure that ctx.obj exists and is a dict (in case `cli()` is called
     # by means other than the `if` block below
     ctx.ensure_object(dict)
     ctx.obj['DEBUG'] = debug
 
-    key_length = int(key_length)
+    key_length = int(key_length or "2048")
+    ctx.obj['key_length'] = key_length
     if key_length < 2048:
         raise click.ClickException("Key length must be at least 2048.")
 
@@ -144,7 +145,7 @@ def newca(ctx):
             keyout_path = os.path.join(ctx.obj['catop'], "private", ctx.obj['cakey'])
             out_path = os.path.join(ctx.obj['catop'], ctx.obj['careq'])
 
-            key_create_cmd = "{0} -newkey rsa:2048 -keyout {1} -out {2}".format(REQ, keyout_path, out_path)
+            key_create_cmd = "{0} -newkey rsa:{1} -keyout {2} -out {3}".format(REQ, ctx.obj['key_length'], keyout_path, out_path)
 
             subprocess.call(shlex.split(key_create_cmd), stdout=subprocess.PIPE)
 

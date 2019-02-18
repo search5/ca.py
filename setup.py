@@ -1,14 +1,17 @@
 from setuptools import setup
 
+with open('README.md') as f:
+    long_description = f.read()
+
 setup(
     name = 'CA.py',
     packages = ['certificator'], # this must be the same as the name above
-    version = '1.7.1',
+    version = '1.8.1',
     description = 'CA.pl Python Fork',
     author = 'Lee Ji-Ho',
     author_email = 'search5@gmail.com',
     url = 'https://github.com/search5/ca.py', # use the URL to the github repo
-    download_url = 'https://github.com/search5/ca.py/tarball/1.7.1', # I'll explain this in a second
+    download_url = 'https://github.com/search5/ca.py/tarball/1.8.1', # I'll explain this in a second
     keywords = ['openssl', 'ca', 'cert'], # arbitrary keywords
     platforms='any',
     install_requires=[
@@ -31,5 +34,7 @@ setup(
         "Topic :: Security :: Cryptography"
     ],
     scripts=['certificator/ca.py'],
-    license='Apache License 2.0'
+    license='Apache License 2.0',
+    long_description=long_description,
+    long_description_content_type='text/markdown',  # This is important!
 )
