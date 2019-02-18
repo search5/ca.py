@@ -90,7 +90,7 @@ def file_exists(ctx, param, value):
 @click.option("--cacert", help="Certificate Authority Key File Name")
 @click.option("--key-length", help="")
 @click.pass_context
-def cli(ctx, debug, config, days, cadays, catop, cakey, careq, cacert, key_length):
+def cli(ctx, debug, config, days, cadays, catop, cakey, careq, cacert, key_length="2048"):
     # ensure that ctx.obj exists and is a dict (in case `cli()` is called
     # by means other than the `if` block below
     ctx.ensure_object(dict)
@@ -126,7 +126,7 @@ def newca(ctx):
     if NEW or (not Path(ctx.obj['catop'], "serial").exists()):
         # create the directory hierarchy
         for item in ("certs", "crl", "newcerts", "private"):
-            Path(ctx.obj['catop'], item).mkdir(parents=True)
+            Path(ctx.obj['catop'], item).mkdir(parents=True, exist_ok=True)
 
         Path(ctx.obj['catop'], "index.txt").write_text("")
         Path(ctx.obj['catop'], "crlnumber").write_text("01\n")
